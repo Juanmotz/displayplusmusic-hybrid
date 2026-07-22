@@ -331,10 +331,30 @@ class SpotifyModel {
     async playPlaylist(playlistId: string): Promise<void> {
         const contextUri = `spotify:playlist:${playlistId}`;
         try {
-            try {
-                await spotifysdk.player.startResumePlayback(this.deviceId, contextUri);
-            } catch {
-                await spotifysdk.player.startResumePlayback('', contextUri);
+            const tryPlay = async (deviceId: string | null): Promise<boolean> => {
+                const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+                const response = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${spotifyAccessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ context_uri: contextUri }),
+                });
+                if (response.ok) return true;
+                console.error('[Spotify] playPlaylist HTTP error:', response.status, await response.text());
+                return false;
+            };
+
+            // Prefer active device ID first, then fallback to Spotify's currently active device.
+            if (await tryPlay(this.deviceId || null)) return;
+            if (await tryPlay(null)) return;
+
+            // Final fallback: play first track directly when context playback is rejected.
+            const tracks = await this.getPlaylistTracks(playlistId);
+            const firstTrack = tracks[0];
+            if (firstTrack) {
+                await this.playTrack(firstTrack.uri);
             }
         } catch (e) { console.error('playPlaylist failed:', e); }
     }
