@@ -46,6 +46,7 @@ function buildContainerConfig(
     showPlaybackButtons: boolean,
     buttonLabels: string[] = ['\u25C1\u25C1', ' \u25B7ll', '\u25B7\u25B7', ' \u25A4'],
     expandBrowseLayout: boolean = false,
+    buttonPressIndicator: string = '',
 ) {
     const useExpandedBrowseLayout = showPlaybackButtons && expandBrowseLayout;
     const listY = 8;
@@ -56,7 +57,7 @@ function buildContainerConfig(
     const playbackBarHeight = useExpandedBrowseLayout ? 2 : MAX_HEIGHT - 155;
 
     return {
-        containerTotalNum: showPlaybackButtons ? 4 : 3,
+        containerTotalNum: showPlaybackButtons ? 5 : 4,
         imageObject: [
             new ImageContainerProperty({
                 xPosition: 2,
@@ -113,6 +114,18 @@ function buildContainerConfig(
                 containerName: 'playbackBar',
                 content: playbackBarText,
                 // zOrderIndex: 1,
+                isEventCapture: 0,
+            }),
+            new TextContainerProperty({
+                xPosition: MAX_WIDTH - 52,
+                yPosition: 2,
+                width: 50,
+                height: 20,
+                borderRadius: 0,
+                borderWidth: 0,
+                containerID: 5,
+                containerName: 'inputPulse',
+                content: buttonPressIndicator,
                 isEventCapture: 0,
             }),
         ],
@@ -194,6 +207,7 @@ export async function createView(song: Song): Promise<void> {
         let displaySongInfo = songInfoText;
 
         const browseStatus = spotifyPresenter.getBrowseStatus();
+        const buttonPressIndicator = spotifyPresenter.shouldShowButtonPressIndicator() ? '■' : '';
 
         if (browseStatus.mode !== 'off') {
             const pendingSelectIcon = Math.floor(Date.now() / 250) % 2 === 0 ? '\u2191' : '\u2193';
@@ -224,7 +238,14 @@ export async function createView(song: Song): Promise<void> {
         }
 
         const showPlaybackButtons = activeSource !== 'navidrome';
-        const config = buildContainerConfig(displaySongInfo, playbackBarText, showPlaybackButtons, buttonLabels, browseStatus.mode !== 'off');
+        const config = buildContainerConfig(
+            displaySongInfo,
+            playbackBarText,
+            showPlaybackButtons,
+            buttonLabels,
+            browseStatus.mode !== 'off',
+            buttonPressIndicator,
+        );
 
         const renderKey = `${activeSource}-${browseStatus.mode}`;
         if (lastRenderedSource !== renderKey) {
@@ -310,6 +331,16 @@ export async function createView(song: Song): Promise<void> {
                 containerID: 4,
                 containerName: 'playbackBar',
                 content: playbackBarText,
+            })),
+            2000,
+            false,
+        );
+
+        await withTimeout(
+            bridge.textContainerUpgrade(new TextContainerUpgrade({
+                containerID: 5,
+                containerName: 'inputPulse',
+                content: buttonPressIndicator,
             })),
             2000,
             false,

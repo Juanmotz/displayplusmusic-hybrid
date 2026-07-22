@@ -61,6 +61,9 @@ export async function eventHandler() {
 
         if (listEvent) {
             console.log(listEvent.currentSelectItemIndex + " " + listEvent.currentSelectItemName);
+            if (isTapEvent(eventTypeName) || isDoubleTapEvent(eventTypeName)) {
+                spotifyPresenter.markButtonPress();
+            }
             if (source === 'navidrome') {
                 return;
             }
