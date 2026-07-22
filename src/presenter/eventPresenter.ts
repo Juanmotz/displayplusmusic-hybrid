@@ -47,11 +47,6 @@ export async function eventHandler() {
         const eventTypeName = getEventTypeName(eventType);
 
         if (source === 'navidrome') {
-            if (isLongPressEvent(eventTypeName)) {
-                spotifyPresenter.enterNavidromeClientSwitcherMode();
-                return;
-            }
-
             if (spotifyPresenter.isInNavidromeClientSwitcherMode()) {
                 if (isSwipeForwardEvent(eventTypeName)) {
                     spotifyPresenter.cycleNavidromeClientSwitcher(-1);
@@ -65,11 +60,6 @@ export async function eventHandler() {
 
                 if (isTapEvent(eventTypeName)) {
                     await spotifyPresenter.selectNavidromeClientSwitcherClient();
-                    return;
-                }
-
-                if (isDoubleTapEvent(eventTypeName)) {
-                    spotifyPresenter.cancelNavidromeClientSwitcherMode();
                     return;
                 }
             }
@@ -119,7 +109,6 @@ export async function eventHandler() {
         if (event.sysEvent) {
             const eventType = event.sysEvent.eventType;
             if (eventType == OsEventTypeList.DOUBLE_CLICK_EVENT) {
-                // Toggle browse mode on Spotify; cancel switcher on Navidrome
                 if (source === 'spotify') {
                     if (spotifyPresenter.isInBrowseMode()) {
                         spotifyPresenter.exitBrowseMode();
@@ -128,17 +117,13 @@ export async function eventHandler() {
                     }
                     return;
                 }
-                if (source === 'navidrome' && spotifyPresenter.isInNavidromeClientSwitcherMode()) {
-                    spotifyPresenter.cancelNavidromeClientSwitcherMode();
+                if (source === 'navidrome') {
+                    if (spotifyPresenter.isInNavidromeClientSwitcherMode()) {
+                        spotifyPresenter.cancelNavidromeClientSwitcherMode();
+                    } else {
+                        spotifyPresenter.enterNavidromeClientSwitcherMode();
+                    }
                     return;
-                }
-            }
-            if (isLongPressEvent(eventTypeName)) {
-                console.log('long press event, shutting down app');
-                if (await bridge.shutDownPageContainer(1)) {
-                    console.log("successful shutdown");
-                } else {
-                    console.log("failed shutdown");
                 }
             }
         }
