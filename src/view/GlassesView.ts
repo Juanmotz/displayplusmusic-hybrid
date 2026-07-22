@@ -207,7 +207,7 @@ export async function createView(song: Song): Promise<void> {
         let displaySongInfo = songInfoText;
 
         const browseStatus = spotifyPresenter.getBrowseStatus();
-        const buttonPressIndicator = spotifyPresenter.shouldShowButtonPressIndicator() ? '■' : '';
+        const buttonPressIndicator = spotifyPresenter.consumeButtonPressIndicator() ? '■' : '';
 
         if (browseStatus.mode !== 'off') {
             const pendingSelectIcon = Math.floor(Date.now() / 250) % 2 === 0 ? '\u2191' : '\u2193';
