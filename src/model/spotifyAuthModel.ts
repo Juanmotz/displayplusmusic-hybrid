@@ -2,7 +2,7 @@ import { storage } from '../utils/storage';
 
 export const SPOTIFY_AUTH_SCOPES =
     'user-modify-playback-state user-read-playback-state playlist-read-private playlist-read-collaborative';
-export const SPOTIFY_REDIRECT_URI = 'https://juanmotz.github.io/displayplusmusic-hybrid/';
+export const SPOTIFY_REDIRECT_URI = 'https://juanmotz.github.io/displayplusmusic-hybrid';
 
 class SpotifyAuthModel {
     get REDIRECT_URI() {
@@ -107,3 +107,4 @@ class SpotifyAuthModel {
 
 const spotifyAuthModel = new SpotifyAuthModel();
 export default spotifyAuthModel;
+
