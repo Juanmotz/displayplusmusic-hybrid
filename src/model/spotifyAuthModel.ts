@@ -2,7 +2,7 @@ import { storage } from '../utils/storage';
 
 class SpotifyAuthModel {
     get REDIRECT_URI() {
-        return 'https://oliemanq.github.io/DisplayPlusMusic/';
+        return `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}`;
     }
     SCOPES = 'user-modify-playback-state user-read-playback-state';
 

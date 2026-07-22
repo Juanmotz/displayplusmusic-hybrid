@@ -21,6 +21,13 @@ When Navidrome is the active source:
  - Tap selects the highlighted client
  - Double-tap exits without changing clients
 
+## How to use
+1. Install dependencies with `npm install`
+2. Start the app with `npm run dev`
+3. Open the Even Hub QR flow or local app URL shown by Vite
+4. For Spotify, enter your Spotify Client ID and Client Secret in the app, and register the exact app URL as a Redirect URI in your Spotify app settings
+5. For Navidrome, switch the source to Navidrome and enter your server URL, username, and password
+
 
 ## Even hub testing QR code
 <img src="src/Assets/githubpagesQR.png" alt="QR Code" width="300" />
