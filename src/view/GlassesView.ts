@@ -28,6 +28,7 @@ let isUpdating = false;
 let isSendingImage = false;
 let lastSongID = "";
 let lastRenderedSource = '';
+let lastRenderedBrowseMode = '';
 let imageRetryAt = 0;
 
 /** Resolves with fallback value if the promise times out or throws. */
@@ -39,7 +40,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 }
 
 /** Builds the container layout for the active source. Content fields are irrelevant for layout comparison. */
-function buildContainerConfig(songInfoText: string, playbackBarText: string, showPlaybackButtons: boolean) {
+function buildContainerConfig(
+    songInfoText: string,
+    playbackBarText: string,
+    showPlaybackButtons: boolean,
+    buttonLabels: [string, string, string] = ['◁◁', ' ▷ll', '▷▷'],
+) {
     return {
         containerTotalNum: showPlaybackButtons ? 4 : 3,
         imageObject: [
@@ -67,7 +73,7 @@ function buildContainerConfig(songInfoText: string, playbackBarText: string, sho
                 isEventCapture: 1,
                 itemContainer: new ListItemContainerProperty({
                     itemCount: 3,
-                    itemName: ['◁◁', ' ▷ll', '▷▷'],
+                    itemName: buttonLabels,
                     isItemSelectBorderEn: 1,
                 }),
             }),
@@ -102,6 +108,22 @@ function buildContainerConfig(songInfoText: string, playbackBarText: string, sho
             }),
         ],
     };
+}
+
+/** Renders a scrollable list for browse mode with a selection indicator. */
+function buildBrowseListText(items: string[], selectedIndex: number, isLoading: boolean): string {
+    if (isLoading) return 'Loading...';
+    if (items.length === 0) return 'Nothing found';
+    const windowSize = 4;
+    const start = Math.max(0, Math.min(selectedIndex - 1, items.length - windowSize));
+    const end = Math.min(items.length, start + windowSize);
+    const lines: string[] = [];
+    if (start > 0) lines.push('  \u2191 more...');
+    for (let i = start; i < end; i++) {
+        lines.push(`${i === selectedIndex ? '\u25B6 ' : '  '}${items[i].substring(0, 22)}`);
+    }
+    if (end < items.length) lines.push('  \u2193 more...');
+    return lines.join('\n');
 }
 
 /** Sends album art in the background — never blocks the text update path. */
@@ -159,7 +181,24 @@ export async function createView(song: Song): Promise<void> {
             `  ${lyricsPresenter.currentLine}\n` +
             `    ${lyricsPresenter.nextLine}`;
 
-        if (activeSource === 'navidrome') {
+        let buttonLabels: [string, string, string] = ['◁◁', ' ▷ll', '▷▷'];
+        let displaySongInfo = songInfoText;
+
+        const browseStatus = spotifyPresenter.getBrowseStatus();
+
+        if (browseStatus.mode !== 'off') {
+            buttonLabels = ['  \u2191', '  \u2713', '  \u2193'];
+            const isPlaylists = browseStatus.mode === 'playlists';
+            const items = isPlaylists
+                ? browseStatus.playlists.map(p => p.name)
+                : browseStatus.tracks.map(t => `${t.name} \u2013 ${t.artist}`);
+            const idx = isPlaylists ? browseStatus.playlistScrollIndex : browseStatus.trackScrollIndex;
+            const heading = isPlaylists ? 'Browse Playlists' : browseStatus.selectedPlaylistName.substring(0, 22);
+            displaySongInfo = `${heading}\n${buildBrowseListText(items, idx, browseStatus.isLoading)}`;
+            playbackBarText = isPlaylists
+                ? '\u2191/\u2193 Scroll  \u2713 Open  2x Back'
+                : '\u2191/\u2193 Scroll  \u2713 Play  2x Back';
+        } else if (activeSource === 'navidrome') {
             const switcher = spotifyPresenter.getNavidromeClientSwitcherStatus();
             if (switcher.isActive) {
                 playbackBarText =
@@ -177,10 +216,12 @@ export async function createView(song: Song): Promise<void> {
         }
 
         const showPlaybackButtons = activeSource !== 'navidrome';
-        const config = buildContainerConfig(songInfoText, playbackBarText, showPlaybackButtons);
+        const config = buildContainerConfig(displaySongInfo, playbackBarText, showPlaybackButtons, buttonLabels);
 
-        if (lastRenderedSource !== activeSource) {
-            lastRenderedSource = activeSource;
+        const renderKey = `${activeSource}-${browseStatus.mode}`;
+        if (lastRenderedSource !== renderKey) {
+            lastRenderedSource = renderKey;
+            lastRenderedBrowseMode = browseStatus.mode;
             if (isPageCreated) {
                 const rebuilt = await withTimeout(
                     bridge.rebuildPageContainer(new RebuildPageContainer(config)),
@@ -220,7 +261,7 @@ export async function createView(song: Song): Promise<void> {
             bridge.textContainerUpgrade(new TextContainerUpgrade({
                 containerID: 3,
                 containerName: 'songInfo',
-                content: songInfoText,
+                content: displaySongInfo,
             })),
             2000,
             false,

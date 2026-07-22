@@ -1,4 +1,5 @@
 import spotifyModel, { initSpotify } from '../model/spotifyModel';
+import type { SpotifyPlaylistInfo, SpotifyTrackInfo } from '../model/spotifyModel';
 import navidromeModel from '../model/navidromeModel';
 import Song, { song_placeholder } from '../model/songModel';
 import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk';
@@ -11,6 +12,16 @@ class SpotifyPresenter {
     private activeSource: MusicSource = 'spotify';
     private isNavidromeClientSwitcherActive = false;
     private navidromeClientCursor = 0;
+
+    // Playlist browser state (Spotify only)
+    private browseMode: 'off' | 'playlists' | 'tracks' = 'off';
+    private playlists: SpotifyPlaylistInfo[] = [];
+    private playlistScrollIndex = 0;
+    private selectedPlaylistName = '';
+    private selectedPlaylistId = '';
+    private tracks: SpotifyTrackInfo[] = [];
+    private trackScrollIndex = 0;
+    private isBrowseLoading = false;
 
     async pollSingle() {
         try {
@@ -112,6 +123,87 @@ class SpotifyPresenter {
         await navidromeModel.setSelectedPlaybackClient(clientName);
         this.currentSong = await navidromeModel.fetchCurrentTrack();
         this.syncNavidromeClientCursor();
+    }
+
+    // ── Playlist browser (Spotify only) ──────────────────────────────────────
+
+    isInBrowseMode(): boolean {
+        return this.activeSource === 'spotify' && this.browseMode !== 'off';
+    }
+
+    async enterBrowseMode(): Promise<void> {
+        if (this.activeSource !== 'spotify') return;
+        this.browseMode = 'playlists';
+        this.playlistScrollIndex = 0;
+        this.isBrowseLoading = true;
+        this.playlists = await spotifyModel.getPlaylists();
+        this.isBrowseLoading = false;
+    }
+
+    exitBrowseMode(): void {
+        this.browseMode = 'off';
+        this.playlists = [];
+        this.tracks = [];
+        this.playlistScrollIndex = 0;
+        this.trackScrollIndex = 0;
+        this.isBrowseLoading = false;
+    }
+
+    async openSelectedPlaylist(): Promise<void> {
+        const playlist = this.playlists[this.playlistScrollIndex];
+        if (!playlist) return;
+        this.selectedPlaylistId = playlist.id;
+        this.selectedPlaylistName = playlist.name;
+        this.browseMode = 'tracks';
+        this.trackScrollIndex = 0;
+        this.isBrowseLoading = true;
+        this.tracks = await spotifyModel.getPlaylistTracks(playlist.id);
+        this.isBrowseLoading = false;
+    }
+
+    async playSelectedTrack(): Promise<void> {
+        const track = this.tracks[this.trackScrollIndex];
+        if (!track) return;
+        await spotifyModel.playTrack(track.uri);
+        this.exitBrowseMode();
+    }
+
+    browseScrollUp(): void {
+        if (this.browseMode === 'playlists') {
+            this.playlistScrollIndex = Math.max(0, this.playlistScrollIndex - 1);
+        } else if (this.browseMode === 'tracks') {
+            this.trackScrollIndex = Math.max(0, this.trackScrollIndex - 1);
+        }
+    }
+
+    browseScrollDown(): void {
+        if (this.browseMode === 'playlists') {
+            this.playlistScrollIndex = Math.min(this.playlists.length - 1, this.playlistScrollIndex + 1);
+        } else if (this.browseMode === 'tracks') {
+            this.trackScrollIndex = Math.min(this.tracks.length - 1, this.trackScrollIndex + 1);
+        }
+    }
+
+    browseBack(): void {
+        if (this.browseMode === 'tracks') {
+            this.browseMode = 'playlists';
+            this.tracks = [];
+            this.trackScrollIndex = 0;
+        } else {
+            this.exitBrowseMode();
+        }
+    }
+
+    getBrowseStatus() {
+        return {
+            mode: this.browseMode,
+            isLoading: this.isBrowseLoading,
+            playlists: this.playlists,
+            playlistScrollIndex: this.playlistScrollIndex,
+            selectedPlaylistName: this.selectedPlaylistName,
+            tracks: this.tracks,
+            trackScrollIndex: this.trackScrollIndex,
+        };
     }
 
     isInNavidromeClientSwitcherMode(): boolean {

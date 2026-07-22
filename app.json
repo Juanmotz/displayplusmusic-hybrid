@@ -1,5 +1,5 @@
 {
-  "package_id": "com.oliemanq.displayplusmusic",
+  "package_id": "com.juanmotz.displayplusmusic.hybrid",
   "edition": "202601",
   "name": "DisplayPlus Music",
   "author": "oliemanq",
@@ -25,6 +25,8 @@
         "https://api.spotify.com/v1/me/player/pause",
         "https://api.spotify.com/v1/me/player/next",
         "https://api.spotify.com/v1/me/player/previous",
+        "https://api.spotify.com/v1/me/playlists",
+        "https://api.spotify.com/v1/playlists",
         "https://i.scdn.co",
         "https://lrclib.net/api/get"
       ]

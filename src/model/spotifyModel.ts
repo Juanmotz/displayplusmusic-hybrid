@@ -1,4 +1,19 @@
-import { SpotifyApi, Track, Episode } from '@spotify/web-api-ts-sdk';
+import { SpotifyApi, Track, Episode, SimplifiedPlaylist, PlaylistItem } from '@spotify/web-api-ts-sdk';
+
+export interface SpotifyPlaylistInfo {
+    id: string;
+    name: string;
+    trackCount: number;
+    uri: string;
+}
+
+export interface SpotifyTrackInfo {
+    id: string;
+    name: string;
+    artist: string;
+    uri: string;
+    durationMs: number;
+}
 import Song, { song_placeholder } from '../model/songModel';
 import { setPlaceholderLoginHint } from '../model/songModel';
 import { downloadImageAsGrayscalePng, downloadImage } from './imageModel';
@@ -223,7 +238,13 @@ class SpotifyModel {
     async song_Play() {
         try {
             this.currentSong?.addisPlaying(true);
-            await spotifysdk.player.startResumePlayback(this.deviceId);
+            try {
+                await spotifysdk.player.startResumePlayback(this.deviceId);
+            } catch {
+                // Cached deviceId may be stale after dormancy — retry on active device
+                console.warn('[Spotify] Play with cached deviceId failed, retrying on active device');
+                await spotifysdk.player.startResumePlayback('');
+            }
         } catch (e) { console.error('Play failed:', e); }
     }
 
@@ -237,6 +258,52 @@ class SpotifyModel {
         try {
             await spotifysdk.player.skipToNext(this.deviceId);
         } catch (e) { console.error('Forward failed:', e); }
+    }
+
+    async getPlaylists(): Promise<SpotifyPlaylistInfo[]> {
+        try {
+            const result = await spotifysdk.currentUser.playlists.playlists(50);
+            return result.items.map((p: SimplifiedPlaylist) => ({
+                id: p.id,
+                name: p.name,
+                trackCount: p.tracks.total,
+                uri: p.uri,
+            }));
+        } catch (e) {
+            console.error('[Spotify] getPlaylists failed:', e);
+            return [];
+        }
+    }
+
+    async getPlaylistTracks(playlistId: string): Promise<SpotifyTrackInfo[]> {
+        try {
+            const result = await spotifysdk.playlists.getPlaylistItems(playlistId, undefined, undefined, 50);
+            return result.items
+                .filter((item: PlaylistItem) => item.track?.type === 'track')
+                .map((item: PlaylistItem) => {
+                    const track = item.track as Track;
+                    return {
+                        id: track.id,
+                        name: track.name,
+                        artist: track.artists[0]?.name ?? 'Unknown',
+                        uri: track.uri,
+                        durationMs: track.duration_ms,
+                    };
+                });
+        } catch (e) {
+            console.error('[Spotify] getPlaylistTracks failed:', e);
+            return [];
+        }
+    }
+
+    async playTrack(trackUri: string): Promise<void> {
+        try {
+            try {
+                await spotifysdk.player.startResumePlayback(this.deviceId, undefined, [trackUri]);
+            } catch {
+                await spotifysdk.player.startResumePlayback('', undefined, [trackUri]);
+            }
+        } catch (e) { console.error('playTrack failed:', e); }
     }
 }
 

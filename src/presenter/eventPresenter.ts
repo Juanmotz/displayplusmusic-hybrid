@@ -80,6 +80,31 @@ export async function eventHandler() {
             if (source === 'navidrome') {
                 return;
             }
+
+            // Long-press enters playlist browser
+            if (isLongPressEvent(eventTypeName) && !spotifyPresenter.isInBrowseMode()) {
+                await spotifyPresenter.enterBrowseMode();
+                return;
+            }
+
+            // Playlist browser navigation
+            if (spotifyPresenter.isInBrowseMode()) {
+                switch (listEvent.currentSelectItemIndex) {
+                    case 0: spotifyPresenter.browseScrollUp(); break;
+                    case 2: spotifyPresenter.browseScrollDown(); break;
+                    default: {
+                        const status = spotifyPresenter.getBrowseStatus();
+                        if (status.mode === 'playlists') {
+                            await spotifyPresenter.openSelectedPlaylist();
+                        } else if (status.mode === 'tracks') {
+                            await spotifyPresenter.playSelectedTrack();
+                        }
+                        break;
+                    }
+                }
+                return;
+            }
+
             switch (listEvent.currentSelectItemIndex) {
                 case 1:
                     spotifyPresenter.song_pauseplay();
@@ -95,6 +120,11 @@ export async function eventHandler() {
         if (event.sysEvent) {
             const eventType = event.sysEvent.eventType;
             if (eventType == OsEventTypeList.DOUBLE_CLICK_EVENT) {
+                // Back out of browser before shutdown
+                if (spotifyPresenter.isInBrowseMode()) {
+                    spotifyPresenter.browseBack();
+                    return;
+                }
                 console.log('double tap event, shutting down app');
                 if (await bridge.shutDownPageContainer(1)) {
                     console.log("successfull shutdown");
