@@ -23,6 +23,82 @@ import spotifyAuthModel from './spotifyAuthModel';
 let spotifysdk!: SpotifyApi;
 let spotifyAccessToken = '';
 
+async function refreshSpotifyAccessToken(): Promise<boolean> {
+    try {
+        const clientId = await storage.getItem('spotify_client_id');
+        const clientSecret = await storage.getItem('spotify_client_secret');
+        const refreshToken = await storage.getItem('spotify_refresh_token');
+
+        if (!clientId || !clientSecret || !refreshToken) {
+            console.error('[Spotify] Cannot refresh access token: missing credentials or refresh token');
+            return false;
+        }
+
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + btoa(`${clientId}:${clientSecret}`),
+            },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+            }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data?.access_token) {
+            console.error('[Spotify] Access token refresh failed:', response.status, data);
+            return false;
+        }
+
+        spotifyAccessToken = data.access_token;
+        const rotatedRefreshToken = data.refresh_token ?? refreshToken;
+        if (rotatedRefreshToken !== refreshToken) {
+            await storage.setItem('spotify_refresh_token', rotatedRefreshToken).catch(console.error);
+        }
+
+        spotifysdk = SpotifyApi.withAccessToken(clientId, {
+            access_token: data.access_token,
+            token_type: data.token_type ?? 'Bearer',
+            expires_in: data.expires_in ?? 3600,
+            refresh_token: rotatedRefreshToken,
+            expires: Date.now() + (data.expires_in ?? 3600) * 1000,
+        });
+
+        return true;
+    } catch (e) {
+        console.error('[Spotify] Access token refresh threw:', e);
+        return false;
+    }
+}
+
+async function spotifyApiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const headers = {
+        ...(init.headers ?? {}),
+        'Authorization': `Bearer ${spotifyAccessToken}`,
+    };
+    let response = await fetch(url, { ...init, headers });
+    if (response.status !== 401) {
+        return response;
+    }
+
+    console.warn('[Spotify] Received 401, attempting token refresh and retry');
+    const refreshed = await refreshSpotifyAccessToken();
+    if (!refreshed) {
+        return response;
+    }
+
+    response = await fetch(url, {
+        ...init,
+        headers: {
+            ...(init.headers ?? {}),
+            'Authorization': `Bearer ${spotifyAccessToken}`,
+        },
+    });
+    return response;
+}
+
 export async function initSpotify(): Promise<void> {
     const clientId = await storage.getItem('spotify_client_id');
     const clientSecret = await storage.getItem('spotify_client_secret');
@@ -273,9 +349,7 @@ class SpotifyModel {
 
     async getPlaylists(): Promise<SpotifyPlaylistInfo[]> {
         try {
-            const response = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
-                headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
-            });
+            const response = await spotifyApiFetch('https://api.spotify.com/v1/me/playlists?limit=50');
             if (!response.ok) {
                 console.error('[Spotify] getPlaylists HTTP error:', response.status, await response.text());
                 return [];
@@ -295,9 +369,7 @@ class SpotifyModel {
 
     async getPlaylistTracks(playlistId: string): Promise<SpotifyTrackInfo[]> {
         try {
-            const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {
-                headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
-            });
+            const response = await spotifyApiFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`);
             if (!response.ok) {
                 console.error('[Spotify] getPlaylistTracks HTTP error:', response.status, await response.text());
                 return [];
@@ -331,16 +403,10 @@ class SpotifyModel {
     async playPlaylist(playlistId: string): Promise<void> {
         const contextUri = `spotify:playlist:${playlistId}`;
         try {
-            const authHeaders = {
-                'Authorization': `Bearer ${spotifyAccessToken}`,
-                'Content-Type': 'application/json',
-            };
+            const authHeaders = { 'Content-Type': 'application/json' };
 
             const chooseDeviceId = async (): Promise<string | null> => {
-                const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
-                });
+                const response = await spotifyApiFetch('https://api.spotify.com/v1/me/player/devices', { method: 'GET' });
                 if (!response.ok) {
                     console.error('[Spotify] get devices HTTP error:', response.status, await response.text());
                     return this.deviceId || null;
@@ -363,7 +429,7 @@ class SpotifyModel {
             };
 
             const transferPlayback = async (deviceId: string): Promise<void> => {
-                const response = await fetch('https://api.spotify.com/v1/me/player', {
+                const response = await spotifyApiFetch('https://api.spotify.com/v1/me/player', {
                     method: 'PUT',
                     headers: authHeaders,
                     body: JSON.stringify({
@@ -378,7 +444,7 @@ class SpotifyModel {
 
             const tryPlay = async (deviceId: string | null): Promise<boolean> => {
                 const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-                const response = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
+                const response = await spotifyApiFetch(`https://api.spotify.com/v1/me/player/play${query}`, {
                     method: 'PUT',
                     headers: authHeaders,
                     body: JSON.stringify({
@@ -393,10 +459,7 @@ class SpotifyModel {
             };
 
             const ensureShuffleEnabled = async (deviceId: string | null): Promise<void> => {
-                const playbackResponse = await fetch('https://api.spotify.com/v1/me/player', {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
-                });
+                const playbackResponse = await spotifyApiFetch('https://api.spotify.com/v1/me/player', { method: 'GET' });
                 if (!playbackResponse.ok) {
                     console.error('[Spotify] shuffle check HTTP error:', playbackResponse.status, await playbackResponse.text());
                     return;
@@ -408,10 +471,7 @@ class SpotifyModel {
                 }
 
                 const shuffleQuery = `?state=true${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`;
-                const shuffleResponse = await fetch(`https://api.spotify.com/v1/me/player/shuffle${shuffleQuery}`, {
-                    method: 'PUT',
-                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
-                });
+                const shuffleResponse = await spotifyApiFetch(`https://api.spotify.com/v1/me/player/shuffle${shuffleQuery}`, { method: 'PUT' });
                 if (!shuffleResponse.ok) {
                     console.error('[Spotify] enable shuffle HTTP error:', shuffleResponse.status, await shuffleResponse.text());
                 }

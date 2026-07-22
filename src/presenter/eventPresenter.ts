@@ -29,6 +29,29 @@ function isDoubleTapEvent(name: string): boolean {
     return name.includes('DOUBLE_CLICK_EVENT');
 }
 
+let usesOneBasedListIndex: boolean | null = null;
+
+function normalizeListIndex(rawIndex: unknown): number {
+    if (typeof rawIndex !== 'number' || Number.isNaN(rawIndex)) {
+        return -1;
+    }
+
+    if (usesOneBasedListIndex === null) {
+        if (rawIndex === 0) {
+            usesOneBasedListIndex = false;
+        } else if (rawIndex === 4) {
+            usesOneBasedListIndex = true;
+        }
+    }
+
+    const normalized = usesOneBasedListIndex ? rawIndex - 1 : rawIndex;
+    return normalized >= 0 && normalized <= 3 ? normalized : -1;
+}
+
+function compactSelectionName(value: unknown): string {
+    return String(value ?? '').replace(/\s+/g, '');
+}
+
 export async function eventHandler() {
     const bridge = await waitForEvenAppBridge();
     const ignoreInputIndicatorUntil = Date.now() + 1500;
@@ -89,7 +112,7 @@ export async function eventHandler() {
 
             // Playlist browser navigation
             if (spotifyPresenter.isInBrowseMode()) {
-                const selectedName = (listEvent.currentSelectItemName ?? '').trim();
+                const selectedName = compactSelectionName(listEvent.currentSelectItemName);
                 if (selectedName === '✓') {
                     await runBrowseSelect();
                     return;
@@ -107,7 +130,7 @@ export async function eventHandler() {
                     return;
                 }
 
-                switch (listEvent.currentSelectItemIndex) {
+                switch (normalizeListIndex(listEvent.currentSelectItemIndex)) {
                     case 0: await runBrowseSelect(); break;
                     case 1: spotifyPresenter.browseScrollUp(); break;
                     case 2: spotifyPresenter.browseScrollDown(); break;
@@ -117,7 +140,28 @@ export async function eventHandler() {
             }
 
             // Normal playback controls — button 4 (index 3) opens browse
-            switch (listEvent.currentSelectItemIndex) {
+            const selectedName = compactSelectionName(listEvent.currentSelectItemName);
+            if (selectedName.includes('◁◁')) {
+                spotifyPresenter.song_back();
+                return;
+            }
+            if (selectedName.includes('▷ll')) {
+                spotifyPresenter.song_pauseplay();
+                return;
+            }
+            if (selectedName.includes('▷▷')) {
+                spotifyPresenter.song_forward();
+                return;
+            }
+            if (selectedName.includes('▤')) {
+                await spotifyPresenter.enterBrowseMode();
+                return;
+            }
+
+            switch (normalizeListIndex(listEvent.currentSelectItemIndex)) {
+                case 0:
+                    spotifyPresenter.song_back();
+                    break;
                 case 1:
                     spotifyPresenter.song_pauseplay();
                     break;
