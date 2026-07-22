@@ -331,8 +331,35 @@ class SpotifyModel {
     async playPlaylist(playlistId: string): Promise<void> {
         const contextUri = `spotify:playlist:${playlistId}`;
         try {
+            const ensureShuffleEnabled = async (deviceId: string | null): Promise<void> => {
+                const playbackQuery = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+                const playbackResponse = await fetch(`https://api.spotify.com/v1/me/player${playbackQuery}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
+                });
+                if (!playbackResponse.ok) {
+                    console.error('[Spotify] shuffle check HTTP error:', playbackResponse.status, await playbackResponse.text());
+                    return;
+                }
+
+                const playbackState = await playbackResponse.json();
+                if (playbackState?.shuffle_state === true) {
+                    return;
+                }
+
+                const shuffleQuery = `?state=true${deviceId ? `&device_id=${encodeURIComponent(deviceId)}` : ''}`;
+                const shuffleResponse = await fetch(`https://api.spotify.com/v1/me/player/shuffle${shuffleQuery}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
+                });
+                if (!shuffleResponse.ok) {
+                    console.error('[Spotify] enable shuffle HTTP error:', shuffleResponse.status, await shuffleResponse.text());
+                }
+            };
+
             const tryPlay = async (deviceId: string | null): Promise<boolean> => {
                 const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+                await ensureShuffleEnabled(deviceId);
                 const response = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
                     method: 'PUT',
                     headers: {
