@@ -81,17 +81,12 @@ export async function eventHandler() {
                 return;
             }
 
-            // Long-press enters playlist browser
-            if (isLongPressEvent(eventTypeName) && !spotifyPresenter.isInBrowseMode()) {
-                await spotifyPresenter.enterBrowseMode();
-                return;
-            }
-
             // Playlist browser navigation
             if (spotifyPresenter.isInBrowseMode()) {
                 switch (listEvent.currentSelectItemIndex) {
                     case 0: spotifyPresenter.browseScrollUp(); break;
                     case 2: spotifyPresenter.browseScrollDown(); break;
+                    case 3: spotifyPresenter.browseBack(); break;
                     default: {
                         const status = spotifyPresenter.getBrowseStatus();
                         if (status.mode === 'playlists') {
@@ -105,12 +100,16 @@ export async function eventHandler() {
                 return;
             }
 
+            // Normal playback controls — button 4 (index 3) opens browse
             switch (listEvent.currentSelectItemIndex) {
                 case 1:
                     spotifyPresenter.song_pauseplay();
                     break;
                 case 2:
                     spotifyPresenter.song_forward();
+                    break;
+                case 3:
+                    await spotifyPresenter.enterBrowseMode();
                     break;
                 default:
                     spotifyPresenter.song_back();
@@ -120,14 +119,24 @@ export async function eventHandler() {
         if (event.sysEvent) {
             const eventType = event.sysEvent.eventType;
             if (eventType == OsEventTypeList.DOUBLE_CLICK_EVENT) {
-                // Back out of browser before shutdown
-                if (spotifyPresenter.isInBrowseMode()) {
-                    spotifyPresenter.browseBack();
+                // Toggle browse mode on Spotify; cancel switcher on Navidrome
+                if (source === 'spotify') {
+                    if (spotifyPresenter.isInBrowseMode()) {
+                        spotifyPresenter.exitBrowseMode();
+                    } else {
+                        await spotifyPresenter.enterBrowseMode();
+                    }
                     return;
                 }
-                console.log('double tap event, shutting down app');
+                if (source === 'navidrome' && spotifyPresenter.isInNavidromeClientSwitcherMode()) {
+                    spotifyPresenter.cancelNavidromeClientSwitcherMode();
+                    return;
+                }
+            }
+            if (isLongPressEvent(eventTypeName)) {
+                console.log('long press event, shutting down app');
                 if (await bridge.shutDownPageContainer(1)) {
-                    console.log("successfull shutdown");
+                    console.log("successful shutdown");
                 } else {
                     console.log("failed shutdown");
                 }

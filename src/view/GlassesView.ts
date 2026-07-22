@@ -44,7 +44,7 @@ function buildContainerConfig(
     songInfoText: string,
     playbackBarText: string,
     showPlaybackButtons: boolean,
-    buttonLabels: [string, string, string] = ['◁◁', ' ▷ll', '▷▷'],
+    buttonLabels: string[] = ['\u25C1\u25C1', ' \u25B7ll', '\u25B7\u25B7', ' \u25A4'],
 ) {
     return {
         containerTotalNum: showPlaybackButtons ? 4 : 3,
@@ -72,8 +72,8 @@ function buildContainerConfig(
                 // zOrderIndex: 1,
                 isEventCapture: 1,
                 itemContainer: new ListItemContainerProperty({
-                    itemCount: 3,
-                    itemName: buttonLabels,
+                    itemCount: buttonLabels.length,
+                    itemName: buttonLabels as [string, string, string],
                     isItemSelectBorderEn: 1,
                 }),
             }),
@@ -181,13 +181,13 @@ export async function createView(song: Song): Promise<void> {
             `  ${lyricsPresenter.currentLine}\n` +
             `    ${lyricsPresenter.nextLine}`;
 
-        let buttonLabels: [string, string, string] = ['◁◁', ' ▷ll', '▷▷'];
+        let buttonLabels: string[] = ['\u25C1\u25C1', ' \u25B7ll', '\u25B7\u25B7', ' \u25A4'];
         let displaySongInfo = songInfoText;
 
         const browseStatus = spotifyPresenter.getBrowseStatus();
 
         if (browseStatus.mode !== 'off') {
-            buttonLabels = ['  \u2191', '  \u2713', '  \u2193'];
+            buttonLabels = ['  \u2191', '  \u2713', '  \u2193', '  \u2190'];
             const isPlaylists = browseStatus.mode === 'playlists';
             const items = isPlaylists
                 ? browseStatus.playlists.map(p => p.name)
