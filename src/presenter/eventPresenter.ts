@@ -31,6 +31,7 @@ function isDoubleTapEvent(name: string): boolean {
 
 export async function eventHandler() {
     const bridge = await waitForEvenAppBridge();
+    const ignoreInputIndicatorUntil = Date.now() + 1500;
 
     const unsubscribe = bridge.onEvenHubEvent(async (event) => {
         const listEvent = event.listEvent;
@@ -61,7 +62,7 @@ export async function eventHandler() {
 
         if (listEvent) {
             console.log(listEvent.currentSelectItemIndex + " " + listEvent.currentSelectItemName);
-            if (isTapEvent(eventTypeName) || isDoubleTapEvent(eventTypeName)) {
+            if ((isTapEvent(eventTypeName) || isDoubleTapEvent(eventTypeName)) && Date.now() >= ignoreInputIndicatorUntil) {
                 spotifyPresenter.markButtonPress();
             }
             if (source === 'navidrome') {

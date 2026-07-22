@@ -24,7 +24,7 @@ class SpotifyPresenter {
     private isBrowseLoading = false;
     private isBrowseSelectPending = false;
     private playlistIdByIndex: string[] = [];
-    private hasPendingButtonPressIndicator = false;
+    private buttonPressIndicatorUntil = 0;
 
     async pollSingle() {
         try {
@@ -53,13 +53,11 @@ class SpotifyPresenter {
     }
 
     markButtonPress(): void {
-        this.hasPendingButtonPressIndicator = true;
+        this.buttonPressIndicatorUntil = Date.now() + 220;
     }
 
-    consumeButtonPressIndicator(): boolean {
-        if (!this.hasPendingButtonPressIndicator) return false;
-        this.hasPendingButtonPressIndicator = false;
-        return true;
+    shouldShowButtonPressIndicator(): boolean {
+        return Date.now() < this.buttonPressIndicatorUntil;
     }
 
     private syncNavidromeClientCursor(): void {
