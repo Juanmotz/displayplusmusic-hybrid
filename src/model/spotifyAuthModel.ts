@@ -1,10 +1,13 @@
 import { storage } from '../utils/storage';
 
+export const SPOTIFY_AUTH_SCOPES =
+    'user-modify-playback-state user-read-playback-state playlist-read-private playlist-read-collaborative';
+
 class SpotifyAuthModel {
     get REDIRECT_URI() {
         return `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}`;
     }
-    SCOPES = 'user-modify-playback-state user-read-playback-state';
+    SCOPES = SPOTIFY_AUTH_SCOPES;
 
     /**
      * Generates a random string for state parameter

@@ -26,6 +26,7 @@ export async function initSpotify(): Promise<void> {
     const clientId = await storage.getItem('spotify_client_id');
     const clientSecret = await storage.getItem('spotify_client_secret');
     const codeData = await spotifyAuthModel.checkForAuthCode();
+    const requiredScopes = spotifyAuthModel.SCOPES;
 
     let refreshToken: string | null = null;
     try {
@@ -39,6 +40,13 @@ export async function initSpotify(): Promise<void> {
         console.error('Spotify credentials not set');
         setPlaceholderLoginHint(true);
         return;
+    }
+
+    const storedScopes = await storage.getItem('spotify_auth_scopes');
+    if (storedScopes !== requiredScopes && refreshToken) {
+        console.log('[Spotify] Auth scope set changed, forcing re-auth for playlist access');
+        refreshToken = null;
+        await storage.removeItem('spotify_refresh_token').catch(console.error);
     }
 
     document.getElementById('spotify-auth-popup')!.style.display = 'none';
@@ -77,6 +85,7 @@ export async function initSpotify(): Promise<void> {
         }
 
         setPlaceholderLoginHint(false);
+        await storage.setItem('spotify_auth_scopes', requiredScopes).catch(console.error);
 
         // Persist rotated refresh token if Spotify issued a new one
         if (authData.refresh_token && authData.refresh_token !== refreshToken) {
