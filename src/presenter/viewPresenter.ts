@@ -1,7 +1,7 @@
 import spotifyPresenter from './spotifyPresenter';
 import navidromeModel from '../model/navidromeModel';
 import { storage } from '../utils/storage';
-import spotifyAuthModel from '../model/spotifyAuthModel';
+import spotifyAuthModel, { getRuntimeRedirectUri, SPOTIFY_REDIRECT_URI_STORAGE_KEY } from '../model/spotifyAuthModel';
 import Song from '../model/songModel';
 import { formatTime } from '../Scripts/formatTime';
 
@@ -81,6 +81,13 @@ class ViewPresenter {
             if (clientSecretInput && val) {
                 clientSecretInput.value = val;
             }
+        });
+        storage.getItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY).then(val => {
+            const redirectUriInput = document.getElementById('redirect-uri') as HTMLInputElement;
+            if (!redirectUriInput) {
+                return;
+            }
+            redirectUriInput.value = (val && val.trim()) ? val : getRuntimeRedirectUri();
         });
         storage.getItem('navidrome_base_url').then(val => {
             const input = document.getElementById('navidrome-base-url') as HTMLInputElement;
@@ -173,14 +180,16 @@ class ViewPresenter {
 
         const clientId = (document.getElementById('client-id') as HTMLInputElement).value.trim();
         const clientSecret = (document.getElementById('client-secret') as HTMLInputElement).value.trim();
+        const redirectUri = (document.getElementById('redirect-uri') as HTMLInputElement).value.trim();
 
-        if (!clientId || !clientSecret) {
-            alert("Please provide both Client ID and Client Secret.");
+        if (!clientId || !clientSecret || !redirectUri) {
+            alert("Please provide Client ID, Client Secret, and Redirect URI.");
             return;
         }
 
         await storage.setItem('spotify_client_id', clientId);
         await storage.setItem('spotify_client_secret', clientSecret);
+        await storage.setItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY, redirectUri);
 
         await spotifyAuthModel.generateAuthUrl(clientId);
     }
@@ -191,6 +200,7 @@ class ViewPresenter {
         await storage.removeItem('spotify_access_token');
         await storage.removeItem('spotify_client_id');
         await storage.removeItem('spotify_client_secret');
+        await storage.removeItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY);
         await storage.removeItem('spotify_auth_state');
         await storage.removeItem('navidrome_base_url');
         await storage.removeItem('navidrome_username');

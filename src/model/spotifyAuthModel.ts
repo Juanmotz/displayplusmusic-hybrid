@@ -2,10 +2,18 @@ import { storage } from '../utils/storage';
 
 export const SPOTIFY_AUTH_SCOPES =
     'user-modify-playback-state user-read-playback-state playlist-read-private playlist-read-collaborative';
+export const SPOTIFY_REDIRECT_URI_STORAGE_KEY = 'spotify_redirect_uri';
+export const SPOTIFY_AUTH_REDIRECT_URI_STORAGE_KEY = 'spotify_auth_redirect_uri';
+
+export function getRuntimeRedirectUri(): string {
+    return `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}`;
+}
 
 class SpotifyAuthModel {
-    get REDIRECT_URI() {
-        return `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}`;
+    async getRedirectUri(): Promise<string> {
+        const stored = await storage.getItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY);
+        const redirectUri = stored?.trim();
+        return redirectUri || getRuntimeRedirectUri();
     }
     SCOPES = SPOTIFY_AUTH_SCOPES;
 
@@ -24,16 +32,18 @@ class SpotifyAuthModel {
      * Initiates the Auth Flow by redirecting the user to Spotify
      */
     async generateAuthUrl(clientId: string): Promise<void> {
-        console.log("Using Redirect URI: " + this.REDIRECT_URI);
+        const redirectUri = await this.getRedirectUri();
+        console.log("Using Redirect URI: " + redirectUri);
         const state = this.generateRandomString(16);
         await storage.setItem('spotify_auth_state', state);
+        await storage.setItem(SPOTIFY_AUTH_REDIRECT_URI_STORAGE_KEY, redirectUri);
 
         const authUrl = new URL("https://accounts.spotify.com/authorize");
         const params = {
             response_type: 'code',
             client_id: clientId,
             scope: this.SCOPES,
-            redirect_uri: this.REDIRECT_URI,
+            redirect_uri: redirectUri,
             state: state,
         };
 
@@ -45,7 +55,7 @@ class SpotifyAuthModel {
     /**
      * Exchanges an auth code for a refresh token
      */
-    async exchangeCodeForToken(code: string, clientId: string, clientSecret: string): Promise<any | null> {
+    async exchangeCodeForToken(code: string, clientId: string, clientSecret: string, redirectUri: string): Promise<any | null> {
         try {
             const response = await fetch('https://accounts.spotify.com/api/token', {
                 method: 'POST',
@@ -56,7 +66,7 @@ class SpotifyAuthModel {
                 body: new URLSearchParams({
                     grant_type: 'authorization_code',
                     code: code,
-                    redirect_uri: this.REDIRECT_URI,
+                    redirect_uri: redirectUri,
                 }),
             });
 
@@ -97,10 +107,12 @@ class SpotifyAuthModel {
 
         const clientId = await storage.getItem('spotify_client_id');
         const clientSecret = await storage.getItem('spotify_client_secret');
+        const redirectUri = (await storage.getItem(SPOTIFY_AUTH_REDIRECT_URI_STORAGE_KEY)) || await this.getRedirectUri();
 
         if (!clientId || !clientSecret) return null;
 
-        return await this.exchangeCodeForToken(code, clientId, clientSecret);
+        await storage.removeItem(SPOTIFY_AUTH_REDIRECT_URI_STORAGE_KEY);
+        return await this.exchangeCodeForToken(code, clientId, clientSecret, redirectUri);
     }
 }
 

@@ -113,10 +113,9 @@
                     <p>in a browser and sign in. From there, create an app and add a name and description of
                         your
                         choice.
-                        <br>Then add <br>
+                        <br>Then copy the Redirect URI shown in this app and add it in Spotify Dashboard exactly as-is.<br>
                     </p>
-                    <p class="popup-link">https://oliemanq.github.io/DisplayPlusMusic/</p>
-                    <p>as a Redirect URI and select 'Web API' at the bottom. <br>
+                    <p>Select 'Web API' at the bottom. <br>
                         Finally, copy your client ID and client secret from there and paste them below.</p>
                 </div>
                 <div id="navidrome-auth-copy" style="display: none; flex-direction: column; gap: 12px;">
@@ -132,6 +131,7 @@
         <div id="spotify-auth-fields" style="width: 100%; display: flex; flex-direction: column; gap: 12px;">
             <input class="popup-input" id="client-id" placeholder="Client ID">
             <input class="popup-input" type="password" id="client-secret" placeholder="Client Secret">
+            <input class="popup-input" id="redirect-uri" placeholder="Redirect URI">
         </div>
 
         <div id="navidrome-auth-fields" style="width: 100%; display: none; flex-direction: column; gap: 12px;">
