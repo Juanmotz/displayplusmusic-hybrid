@@ -164,6 +164,7 @@ class SpotifyPresenter {
     }
 
     async openPlaylistByMenuIndex(index: number): Promise<void> {
+        if (this.isBrowseSelectPending) return;
         const playlistId = this.playlistIdByIndex[index];
         if (!playlistId) return;
 

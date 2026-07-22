@@ -1,6 +1,6 @@
 {
   "name": "displayplus-music",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "description": "Music display for the Even G2 smart glasses",
   "homepage": "https://github.com/Juanmotz/displayplusmusic-hybrid#readme",
   "bugs": {
@@ -36,20 +36,3 @@
     "vite-plugin-singlefile": "^2.3.2"
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

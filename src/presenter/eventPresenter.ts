@@ -32,19 +32,21 @@ function isDoubleTapEvent(name: string): boolean {
 let usesOneBasedListIndex: boolean | null = null;
 
 function normalizeListIndex(rawIndex: unknown): number {
-    if (typeof rawIndex !== 'number' || Number.isNaN(rawIndex)) {
+    const numericIndex = typeof rawIndex === 'number' ? rawIndex : Number(rawIndex);
+    if (!Number.isFinite(numericIndex)) {
         return -1;
     }
+    const index = Math.trunc(numericIndex);
 
     if (usesOneBasedListIndex === null) {
-        if (rawIndex === 0) {
+        if (index === 0) {
             usesOneBasedListIndex = false;
-        } else if (rawIndex === 4) {
+        } else if (index === 4) {
             usesOneBasedListIndex = true;
         }
     }
 
-    const normalized = usesOneBasedListIndex ? rawIndex - 1 : rawIndex;
+    const normalized = usesOneBasedListIndex ? index - 1 : index;
     return normalized >= 0 && normalized <= 3 ? normalized : -1;
 }
 
@@ -113,6 +115,10 @@ export async function eventHandler() {
             // Playlist browser navigation
             if (spotifyPresenter.isInBrowseMode()) {
                 const selectedName = compactSelectionName(listEvent.currentSelectItemName);
+                if (normalizeListIndex(listEvent.currentSelectItemIndex) === 0) {
+                    await runBrowseSelect();
+                    return;
+                }
                 if (selectedName === '✓') {
                     await runBrowseSelect();
                     return;
