@@ -1,4 +1,4 @@
-import { SpotifyApi, Track, Episode, SimplifiedPlaylist, PlaylistItem } from '@spotify/web-api-ts-sdk';
+import { SpotifyApi, Track, Episode } from '@spotify/web-api-ts-sdk';
 
 export interface SpotifyPlaylistInfo {
     id: string;
@@ -21,6 +21,7 @@ import { storage } from '../utils/storage';
 import spotifyAuthModel from './spotifyAuthModel';
 
 let spotifysdk!: SpotifyApi;
+let spotifyAccessToken = '';
 
 export async function initSpotify(): Promise<void> {
     const clientId = await storage.getItem('spotify_client_id');
@@ -100,6 +101,7 @@ export async function initSpotify(): Promise<void> {
             refresh_token: refreshToken ?? '',
             expires: Date.now() + authData.expires_in * 1000,
         });
+        spotifyAccessToken = authData.access_token;
 
         console.log('Spotify SDK initialized.');
     } catch (e) {
@@ -271,11 +273,18 @@ class SpotifyModel {
 
     async getPlaylists(): Promise<SpotifyPlaylistInfo[]> {
         try {
-            const result = await spotifysdk.currentUser.playlists.playlists(50);
-            return result.items.map((p: SimplifiedPlaylist) => ({
+            const response = await fetch('https://api.spotify.com/v1/me/playlists?limit=50', {
+                headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
+            });
+            if (!response.ok) {
+                console.error('[Spotify] getPlaylists HTTP error:', response.status, await response.text());
+                return [];
+            }
+            const result = await response.json();
+            return (result.items ?? []).map((p: any) => ({
                 id: p.id,
                 name: p.name,
-                trackCount: p.tracks.total,
+                trackCount: p.tracks?.total ?? 0,
                 uri: p.uri,
             }));
         } catch (e) {
@@ -286,19 +295,23 @@ class SpotifyModel {
 
     async getPlaylistTracks(playlistId: string): Promise<SpotifyTrackInfo[]> {
         try {
-            const result = await spotifysdk.playlists.getPlaylistItems(playlistId, undefined, undefined, 50);
-            return result.items
-                .filter((item: PlaylistItem) => item.track?.type === 'track')
-                .map((item: PlaylistItem) => {
-                    const track = item.track as Track;
-                    return {
-                        id: track.id,
-                        name: track.name,
-                        artist: track.artists[0]?.name ?? 'Unknown',
-                        uri: track.uri,
-                        durationMs: track.duration_ms,
-                    };
-                });
+            const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {
+                headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
+            });
+            if (!response.ok) {
+                console.error('[Spotify] getPlaylistTracks HTTP error:', response.status, await response.text());
+                return [];
+            }
+            const result = await response.json();
+            return (result.items ?? [])
+                .filter((item: any) => item?.track?.type === 'track')
+                .map((item: any) => ({
+                    id: item.track.id,
+                    name: item.track.name,
+                    artist: item.track.artists?.[0]?.name ?? 'Unknown',
+                    uri: item.track.uri,
+                    durationMs: item.track.duration_ms,
+                }));
         } catch (e) {
             console.error('[Spotify] getPlaylistTracks failed:', e);
             return [];
