@@ -77,10 +77,8 @@ export async function eventHandler() {
             // Playlist browser navigation
             if (spotifyPresenter.isInBrowseMode()) {
                 switch (listEvent.currentSelectItemIndex) {
-                    case 0: spotifyPresenter.browseScrollUp(); break;
-                    case 2: spotifyPresenter.browseScrollDown(); break;
-                    case 3: spotifyPresenter.browseBack(); break;
-                    default: {
+                    case 0: {
+                        // ✓ select — confirm current item
                         const status = spotifyPresenter.getBrowseStatus();
                         if (status.mode === 'playlists') {
                             await spotifyPresenter.openSelectedPlaylist();
@@ -89,6 +87,9 @@ export async function eventHandler() {
                         }
                         break;
                     }
+                    case 1: spotifyPresenter.browseScrollUp(); break;
+                    case 2: spotifyPresenter.browseScrollDown(); break;
+                    case 3: spotifyPresenter.browseBack(); break;
                 }
                 return;
             }

@@ -152,13 +152,8 @@ class SpotifyPresenter {
     async openSelectedPlaylist(): Promise<void> {
         const playlist = this.playlists[this.playlistScrollIndex];
         if (!playlist) return;
-        this.selectedPlaylistId = playlist.id;
-        this.selectedPlaylistName = playlist.name;
-        this.browseMode = 'tracks';
-        this.trackScrollIndex = 0;
-        this.isBrowseLoading = true;
-        this.tracks = await spotifyModel.getPlaylistTracks(playlist.id);
-        this.isBrowseLoading = false;
+        await spotifyModel.playPlaylist(playlist.id);
+        this.exitBrowseMode();
     }
 
     async playSelectedTrack(): Promise<void> {

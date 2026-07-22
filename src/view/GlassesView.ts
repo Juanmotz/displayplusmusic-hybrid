@@ -187,7 +187,7 @@ export async function createView(song: Song): Promise<void> {
         const browseStatus = spotifyPresenter.getBrowseStatus();
 
         if (browseStatus.mode !== 'off') {
-            buttonLabels = ['  \u2191', '  \u2713', '  \u2193', '  \u2190'];
+            buttonLabels = ['  \u2713', '  \u2191', '  \u2193', '  \u2190'];
             const isPlaylists = browseStatus.mode === 'playlists';
             const items = isPlaylists
                 ? browseStatus.playlists.map(p => p.name)

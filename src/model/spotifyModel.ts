@@ -327,6 +327,17 @@ class SpotifyModel {
             }
         } catch (e) { console.error('playTrack failed:', e); }
     }
+
+    async playPlaylist(playlistId: string): Promise<void> {
+        const contextUri = `spotify:playlist:${playlistId}`;
+        try {
+            try {
+                await spotifysdk.player.startResumePlayback(this.deviceId, contextUri);
+            } catch {
+                await spotifysdk.player.startResumePlayback('', contextUri);
+            }
+        } catch (e) { console.error('playPlaylist failed:', e); }
+    }
 }
 
 const spotifyModel = new SpotifyModel();
