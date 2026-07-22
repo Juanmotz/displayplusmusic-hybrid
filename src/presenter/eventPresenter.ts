@@ -69,6 +69,72 @@ export async function eventHandler() {
         const eventTypeName = getEventTypeName(eventType);
         const tap = isTapEvent(eventTypeName);
         const doubleTap = isDoubleTapEvent(eventTypeName);
+        const hasUnknownEventType = eventTypeName.length === 0;
+
+        const runBrowseSelect = async () => {
+            const status = spotifyPresenter.getBrowseStatus();
+            if (status.mode === 'playlists') {
+                await spotifyPresenter.openPlaylistByMenuIndex(status.playlistScrollIndex);
+            } else if (status.mode === 'tracks') {
+                await spotifyPresenter.playSelectedTrack();
+            }
+        };
+
+        const runBrowseActionBySelection = async (selectedName: string, selectedIndex: number): Promise<boolean> => {
+            if (selectedName === '✓' || selectedIndex === 0) {
+                await runBrowseSelect();
+                return true;
+            }
+            if (selectedName === '↑' || selectedIndex === 1) {
+                spotifyPresenter.browseScrollUp();
+                return true;
+            }
+            if (selectedName === '↓' || selectedIndex === 2) {
+                spotifyPresenter.browseScrollDown();
+                return true;
+            }
+            if (selectedName === '←' || selectedIndex === 3) {
+                spotifyPresenter.browseBack();
+                return true;
+            }
+            return false;
+        };
+
+        const runPlaybackActionBySelection = async (selectedName: string, selectedIndex: number): Promise<boolean> => {
+            if (selectedName.includes('◁◁')) {
+                spotifyPresenter.song_back();
+                return true;
+            }
+            if (selectedName.includes('▷ll')) {
+                spotifyPresenter.song_pauseplay();
+                return true;
+            }
+            if (selectedName.includes('▷▷')) {
+                spotifyPresenter.song_forward();
+                return true;
+            }
+            if (selectedName.includes('▤')) {
+                await spotifyPresenter.enterBrowseMode();
+                return true;
+            }
+
+            switch (selectedIndex) {
+                case 0:
+                    spotifyPresenter.song_back();
+                    return true;
+                case 1:
+                    spotifyPresenter.song_pauseplay();
+                    return true;
+                case 2:
+                    spotifyPresenter.song_forward();
+                    return true;
+                case 3:
+                    await spotifyPresenter.enterBrowseMode();
+                    return true;
+                default:
+                    return false;
+            }
+        };
 
         if (listEvent) {
             lastSelectedButtonIndex = normalizeListIndex(listEvent.currentSelectItemIndex);
@@ -100,15 +166,6 @@ export async function eventHandler() {
             return;
         }
 
-        const runBrowseSelect = async () => {
-            const status = spotifyPresenter.getBrowseStatus();
-            if (status.mode === 'playlists') {
-                await spotifyPresenter.openPlaylistByMenuIndex(status.playlistScrollIndex);
-            } else if (status.mode === 'tracks') {
-                await spotifyPresenter.playSelectedTrack();
-            }
-        };
-
         if (doubleTap) {
             if (spotifyPresenter.isInBrowseMode()) {
                 spotifyPresenter.exitBrowseMode();
@@ -120,6 +177,11 @@ export async function eventHandler() {
 
         // Playlist browser navigation/actions
         if (spotifyPresenter.isInBrowseMode()) {
+            // Compatibility path: some runtimes deliver list payloads but no decodable event type.
+            if (listEvent && hasUnknownEventType) {
+                await runBrowseActionBySelection(lastSelectedButtonName, lastSelectedButtonIndex);
+                return;
+            }
             if (isSwipeForwardEvent(eventTypeName)) {
                 spotifyPresenter.browseScrollUp();
                 return;
@@ -134,62 +196,21 @@ export async function eventHandler() {
 
             const selectedName = lastSelectedButtonName;
             const selectedIndex = lastSelectedButtonIndex;
-            if (selectedName === '✓' || selectedIndex === 0) {
-                await runBrowseSelect();
-                return;
-            }
-            if (selectedName === '↑' || selectedIndex === 1) {
-                spotifyPresenter.browseScrollUp();
-                return;
-            }
-            if (selectedName === '↓' || selectedIndex === 2) {
-                spotifyPresenter.browseScrollDown();
-                return;
-            }
-            if (selectedName === '←' || selectedIndex === 3) {
-                spotifyPresenter.browseBack();
-                return;
-            }
+            await runBrowseActionBySelection(selectedName, selectedIndex);
             return;
         }
 
         // Normal playback controls
+        if (listEvent && hasUnknownEventType) {
+            await runPlaybackActionBySelection(lastSelectedButtonName, lastSelectedButtonIndex);
+            return;
+        }
+
         if (!tap) {
             return;
         }
 
-        const selectedName = lastSelectedButtonName;
-        if (selectedName.includes('◁◁')) {
-            spotifyPresenter.song_back();
-            return;
-        }
-        if (selectedName.includes('▷ll')) {
-            spotifyPresenter.song_pauseplay();
-            return;
-        }
-        if (selectedName.includes('▷▷')) {
-            spotifyPresenter.song_forward();
-            return;
-        }
-        if (selectedName.includes('▤')) {
-            await spotifyPresenter.enterBrowseMode();
-            return;
-        }
-
-        switch (lastSelectedButtonIndex) {
-            case 0:
-                spotifyPresenter.song_back();
-                break;
-            case 1:
-                spotifyPresenter.song_pauseplay();
-                break;
-            case 2:
-                spotifyPresenter.song_forward();
-                break;
-            case 3:
-                await spotifyPresenter.enterBrowseMode();
-                break;
-        }
+        await runPlaybackActionBySelection(lastSelectedButtonName, lastSelectedButtonIndex);
     });
 
     // Return unsubscribe in case we need to stop listening later
