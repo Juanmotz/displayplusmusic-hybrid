@@ -369,21 +369,32 @@ class SpotifyModel {
 
     async getPlaylistTracks(playlistId: string): Promise<SpotifyTrackInfo[]> {
         try {
-            const response = await spotifyApiFetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`);
-            if (!response.ok) {
-                console.error('[Spotify] getPlaylistTracks HTTP error:', response.status, await response.text());
-                return [];
+            const tracks: SpotifyTrackInfo[] = [];
+            let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100`;
+
+            while (nextUrl && tracks.length < 500) {
+                const response = await spotifyApiFetch(nextUrl);
+                if (!response.ok) {
+                    console.error('[Spotify] getPlaylistTracks HTTP error:', response.status, await response.text());
+                    return tracks;
+                }
+
+                const result = await response.json();
+                const pageTracks = (result.items ?? [])
+                    .filter((item: any) => item?.track?.type === 'track')
+                    .map((item: any) => ({
+                        id: item.track.id,
+                        name: item.track.name,
+                        artist: item.track.artists?.[0]?.name ?? 'Unknown',
+                        uri: item.track.uri,
+                        durationMs: item.track.duration_ms,
+                    }));
+                tracks.push(...pageTracks);
+
+                nextUrl = typeof result?.next === 'string' ? result.next : null;
             }
-            const result = await response.json();
-            return (result.items ?? [])
-                .filter((item: any) => item?.track?.type === 'track')
-                .map((item: any) => ({
-                    id: item.track.id,
-                    name: item.track.name,
-                    artist: item.track.artists?.[0]?.name ?? 'Unknown',
-                    uri: item.track.uri,
-                    durationMs: item.track.duration_ms,
-                }));
+
+            return tracks;
         } catch (e) {
             console.error('[Spotify] getPlaylistTracks failed:', e);
             return [];
@@ -404,6 +415,16 @@ class SpotifyModel {
         const contextUri = `spotify:playlist:${playlistId}`;
         try {
             const authHeaders = { 'Content-Type': 'application/json' };
+            const shuffleUris = (uris: string[]): string[] => {
+                const copy = [...uris];
+                for (let i = copy.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    const tmp = copy[i];
+                    copy[i] = copy[j];
+                    copy[j] = tmp;
+                }
+                return copy;
+            };
 
             const chooseDeviceId = async (): Promise<string | null> => {
                 const response = await spotifyApiFetch('https://api.spotify.com/v1/me/player/devices', { method: 'GET' });
@@ -442,7 +463,7 @@ class SpotifyModel {
                 }
             };
 
-            const tryPlay = async (deviceId: string | null): Promise<boolean> => {
+            const tryPlayContext = async (deviceId: string | null): Promise<boolean> => {
                 const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
                 const response = await spotifyApiFetch(`https://api.spotify.com/v1/me/player/play${query}`, {
                     method: 'PUT',
@@ -455,6 +476,30 @@ class SpotifyModel {
                 });
                 if (response.ok) return true;
                 console.error('[Spotify] playPlaylist HTTP error:', response.status, await response.text());
+                return false;
+            };
+
+            const tryPlayUris = async (uris: string[], deviceId: string | null): Promise<boolean> => {
+                if (uris.length === 0) return false;
+
+                try {
+                    await spotifysdk.player.startResumePlayback(deviceId ?? '', undefined, uris);
+                    return true;
+                } catch (sdkError) {
+                    console.warn('[Spotify] SDK URI playback failed, retrying via REST:', sdkError);
+                }
+
+                const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+                const response = await spotifyApiFetch(`https://api.spotify.com/v1/me/player/play${query}`, {
+                    method: 'PUT',
+                    headers: authHeaders,
+                    body: JSON.stringify({
+                        uris,
+                        position_ms: 0,
+                    }),
+                });
+                if (response.ok) return true;
+                console.error('[Spotify] URI playlist playback HTTP error:', response.status, await response.text());
                 return false;
             };
 
@@ -483,17 +528,32 @@ class SpotifyModel {
                 this.deviceId = targetDeviceId;
             }
 
-            if (await tryPlay(targetDeviceId)) {
+            // Primary path: play concrete playlist track URIs (shuffled client-side).
+            const tracks = await this.getPlaylistTracks(playlistId);
+            const shuffledUris = shuffleUris(
+                tracks
+                    .map(track => track.uri)
+                    .filter((uri): uri is string => typeof uri === 'string' && uri.length > 0),
+            );
+            const urisToPlay = shuffledUris.slice(0, 100);
+            if (await tryPlayUris(urisToPlay, targetDeviceId)) {
+                return;
+            }
+            if (await tryPlayUris(urisToPlay, null)) {
+                return;
+            }
+
+            // Secondary path: context playback for full server-side playlist behavior.
+            if (await tryPlayContext(targetDeviceId)) {
                 await ensureShuffleEnabled(targetDeviceId);
                 return;
             }
-            if (await tryPlay(null)) {
+            if (await tryPlayContext(null)) {
                 await ensureShuffleEnabled(null);
                 return;
             }
 
-            // Final fallback: play first track directly when context playback is rejected.
-            const tracks = await this.getPlaylistTracks(playlistId);
+            // Final fallback: play first track directly.
             const firstTrack = tracks[0];
             if (firstTrack) {
                 await this.playTrack(firstTrack.uri);
