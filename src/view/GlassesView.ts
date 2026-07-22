@@ -45,7 +45,16 @@ function buildContainerConfig(
     playbackBarText: string,
     showPlaybackButtons: boolean,
     buttonLabels: string[] = ['\u25C1\u25C1', ' \u25B7ll', '\u25B7\u25B7', ' \u25A4'],
+    expandBrowseLayout: boolean = false,
 ) {
+    const useExpandedBrowseLayout = showPlaybackButtons && expandBrowseLayout;
+    const listY = 8;
+    const listHeight = useExpandedBrowseLayout ? MAX_HEIGHT - (listY * 2) : 132;
+    const songInfoY = useExpandedBrowseLayout ? 8 : 12;
+    const songInfoHeight = useExpandedBrowseLayout ? MAX_HEIGHT - 12 : 132;
+    const playbackBarY = useExpandedBrowseLayout ? MAX_HEIGHT - 2 : 155;
+    const playbackBarHeight = useExpandedBrowseLayout ? 2 : MAX_HEIGHT - 155;
+
     return {
         containerTotalNum: showPlaybackButtons ? 4 : 3,
         imageObject: [
@@ -62,9 +71,9 @@ function buildContainerConfig(
         listObject: showPlaybackButtons ? [
             new ListContainerProperty({
                 xPosition: 155,
-                yPosition: 8,
+                yPosition: listY,
                 width: 80,
-                height: 132,
+                height: listHeight,
                 borderWidth: 0,
                 borderRadius: 0,
                 containerID: 2,
@@ -81,9 +90,9 @@ function buildContainerConfig(
         textObject: [
             new TextContainerProperty({
                 xPosition: showPlaybackButtons ? 234 : 155,
-                yPosition: 12,
+                yPosition: songInfoY,
                 width: showPlaybackButtons ? MAX_WIDTH - 232 : MAX_WIDTH - 153,
-                height: 132,
+                height: songInfoHeight,
                 borderRadius: 12,
                 borderWidth: 1,
                 paddingLength: 16,
@@ -95,9 +104,9 @@ function buildContainerConfig(
             }),
             new TextContainerProperty({
                 xPosition: 0,
-                yPosition: 155,
+                yPosition: playbackBarY,
                 width: MAX_WIDTH,
-                height: MAX_HEIGHT - 155,
+                height: playbackBarHeight,
                 borderRadius: 6,
                 borderWidth: 0,
                 containerID: 4,
@@ -114,7 +123,7 @@ function buildContainerConfig(
 function buildBrowseListText(items: string[], selectedIndex: number, isLoading: boolean): string {
     if (isLoading) return 'Loading...';
     if (items.length === 0) return 'Nothing found';
-    const windowSize = 4;
+    const windowSize = 8;
     const start = Math.max(0, Math.min(selectedIndex - 1, items.length - windowSize));
     const end = Math.min(items.length, start + windowSize);
     const lines: string[] = [];
@@ -195,9 +204,7 @@ export async function createView(song: Song): Promise<void> {
             const idx = isPlaylists ? browseStatus.playlistScrollIndex : browseStatus.trackScrollIndex;
             const heading = isPlaylists ? 'Browse Playlists' : browseStatus.selectedPlaylistName.substring(0, 22);
             displaySongInfo = `${heading}\n${buildBrowseListText(items, idx, browseStatus.isLoading)}`;
-            playbackBarText = isPlaylists
-                ? '\u2191/\u2193 Scroll  \u2713 Open  2x Back'
-                : '\u2191/\u2193 Scroll  \u2713 Play  2x Back';
+            playbackBarText = '';
         } else if (activeSource === 'navidrome') {
             const switcher = spotifyPresenter.getNavidromeClientSwitcherStatus();
             if (switcher.isActive) {
@@ -216,7 +223,7 @@ export async function createView(song: Song): Promise<void> {
         }
 
         const showPlaybackButtons = activeSource !== 'navidrome';
-        const config = buildContainerConfig(displaySongInfo, playbackBarText, showPlaybackButtons, buttonLabels);
+        const config = buildContainerConfig(displaySongInfo, playbackBarText, showPlaybackButtons, buttonLabels, browseStatus.mode !== 'off');
 
         const renderKey = `${activeSource}-${browseStatus.mode}`;
         if (lastRenderedSource !== renderKey) {
