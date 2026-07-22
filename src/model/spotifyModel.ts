@@ -331,9 +331,69 @@ class SpotifyModel {
     async playPlaylist(playlistId: string): Promise<void> {
         const contextUri = `spotify:playlist:${playlistId}`;
         try {
+            const authHeaders = {
+                'Authorization': `Bearer ${spotifyAccessToken}`,
+                'Content-Type': 'application/json',
+            };
+
+            const chooseDeviceId = async (): Promise<string | null> => {
+                const response = await fetch('https://api.spotify.com/v1/me/player/devices', {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
+                });
+                if (!response.ok) {
+                    console.error('[Spotify] get devices HTTP error:', response.status, await response.text());
+                    return this.deviceId || null;
+                }
+
+                const result = await response.json();
+                const devices = Array.isArray(result?.devices) ? result.devices : [];
+                const controllableDevices = devices.filter((d: any) => d && d.id && d.is_restricted !== true);
+                if (controllableDevices.length === 0) {
+                    return this.deviceId || null;
+                }
+
+                const cached = controllableDevices.find((d: any) => d.id === this.deviceId);
+                if (cached) {
+                    return cached.id;
+                }
+
+                const active = controllableDevices.find((d: any) => d.is_active === true);
+                return (active?.id ?? controllableDevices[0].id ?? null) as string | null;
+            };
+
+            const transferPlayback = async (deviceId: string): Promise<void> => {
+                const response = await fetch('https://api.spotify.com/v1/me/player', {
+                    method: 'PUT',
+                    headers: authHeaders,
+                    body: JSON.stringify({
+                        device_ids: [deviceId],
+                        play: true,
+                    }),
+                });
+                if (!response.ok) {
+                    console.error('[Spotify] transfer playback HTTP error:', response.status, await response.text());
+                }
+            };
+
+            const tryPlay = async (deviceId: string | null): Promise<boolean> => {
+                const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
+                const response = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
+                    method: 'PUT',
+                    headers: authHeaders,
+                    body: JSON.stringify({
+                        context_uri: contextUri,
+                        offset: { position: 0 },
+                        position_ms: 0,
+                    }),
+                });
+                if (response.ok) return true;
+                console.error('[Spotify] playPlaylist HTTP error:', response.status, await response.text());
+                return false;
+            };
+
             const ensureShuffleEnabled = async (deviceId: string | null): Promise<void> => {
-                const playbackQuery = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-                const playbackResponse = await fetch(`https://api.spotify.com/v1/me/player${playbackQuery}`, {
+                const playbackResponse = await fetch('https://api.spotify.com/v1/me/player', {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${spotifyAccessToken}` },
                 });
@@ -357,25 +417,20 @@ class SpotifyModel {
                 }
             };
 
-            const tryPlay = async (deviceId: string | null): Promise<boolean> => {
-                const query = deviceId ? `?device_id=${encodeURIComponent(deviceId)}` : '';
-                await ensureShuffleEnabled(deviceId);
-                const response = await fetch(`https://api.spotify.com/v1/me/player/play${query}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${spotifyAccessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ context_uri: contextUri }),
-                });
-                if (response.ok) return true;
-                console.error('[Spotify] playPlaylist HTTP error:', response.status, await response.text());
-                return false;
-            };
+            const targetDeviceId = await chooseDeviceId();
+            if (targetDeviceId) {
+                await transferPlayback(targetDeviceId);
+                this.deviceId = targetDeviceId;
+            }
 
-            // Prefer active device ID first, then fallback to Spotify's currently active device.
-            if (await tryPlay(this.deviceId || null)) return;
-            if (await tryPlay(null)) return;
+            if (await tryPlay(targetDeviceId)) {
+                await ensureShuffleEnabled(targetDeviceId);
+                return;
+            }
+            if (await tryPlay(null)) {
+                await ensureShuffleEnabled(null);
+                return;
+            }
 
             // Final fallback: play first track directly when context playback is rejected.
             const tracks = await this.getPlaylistTracks(playlistId);
