@@ -9,11 +9,29 @@ export function getRuntimeRedirectUri(): string {
     return `${window.location.origin}${window.location.pathname.replace(/index\.html$/, '')}`;
 }
 
+function sanitizeRedirectUri(raw: string | null): string {
+    const runtimeRedirect = getRuntimeRedirectUri();
+    const value = raw?.trim();
+    if (!value) return runtimeRedirect;
+
+    try {
+        const parsed = new URL(value);
+        // Prevent saving the repository URL as OAuth callback.
+        if (parsed.hostname === 'github.com') {
+            console.warn('[SpotifyAuth] Invalid redirect URI host github.com, falling back to runtime URI');
+            return runtimeRedirect;
+        }
+        return parsed.toString();
+    } catch {
+        console.warn('[SpotifyAuth] Invalid redirect URI format, falling back to runtime URI');
+        return runtimeRedirect;
+    }
+}
+
 class SpotifyAuthModel {
     async getRedirectUri(): Promise<string> {
         const stored = await storage.getItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY);
-        const redirectUri = stored?.trim();
-        return redirectUri || getRuntimeRedirectUri();
+        return sanitizeRedirectUri(stored);
     }
     SCOPES = SPOTIFY_AUTH_SCOPES;
 

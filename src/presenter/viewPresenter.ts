@@ -187,9 +187,21 @@ class ViewPresenter {
             return;
         }
 
+        let parsedRedirect: URL;
+        try {
+            parsedRedirect = new URL(redirectUri);
+        } catch {
+            alert("Redirect URI must be a valid URL.");
+            return;
+        }
+        if (parsedRedirect.hostname === 'github.com') {
+            alert("Use your GitHub Pages callback URL (github.io), not the github.com repository URL.");
+            return;
+        }
+
         await storage.setItem('spotify_client_id', clientId);
         await storage.setItem('spotify_client_secret', clientSecret);
-        await storage.setItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY, redirectUri);
+        await storage.setItem(SPOTIFY_REDIRECT_URI_STORAGE_KEY, parsedRedirect.toString());
 
         await spotifyAuthModel.generateAuthUrl(clientId);
     }
