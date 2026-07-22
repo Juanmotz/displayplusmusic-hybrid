@@ -68,7 +68,7 @@ export async function eventHandler() {
             const runBrowseSelect = async () => {
                 const status = spotifyPresenter.getBrowseStatus();
                 if (status.mode === 'playlists') {
-                    await spotifyPresenter.openSelectedPlaylist();
+                    await spotifyPresenter.openPlaylistByMenuIndex(status.playlistScrollIndex);
                 } else if (status.mode === 'tracks') {
                     await spotifyPresenter.playSelectedTrack();
                 }

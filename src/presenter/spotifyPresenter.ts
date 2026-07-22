@@ -23,6 +23,7 @@ class SpotifyPresenter {
     private trackScrollIndex = 0;
     private isBrowseLoading = false;
     private isBrowseSelectPending = false;
+    private playlistIdByIndex: string[] = [];
 
     async pollSingle() {
         try {
@@ -138,12 +139,14 @@ class SpotifyPresenter {
         this.playlistScrollIndex = 0;
         this.isBrowseLoading = true;
         this.playlists = await spotifyModel.getPlaylists();
+        this.playlistIdByIndex = this.playlists.map(playlist => playlist.id);
         this.isBrowseLoading = false;
     }
 
     exitBrowseMode(): void {
         this.browseMode = 'off';
         this.playlists = [];
+        this.playlistIdByIndex = [];
         this.tracks = [];
         this.playlistScrollIndex = 0;
         this.trackScrollIndex = 0;
@@ -151,13 +154,21 @@ class SpotifyPresenter {
         this.isBrowseSelectPending = false;
     }
 
-    async openSelectedPlaylist(): Promise<void> {
-        const playlist = this.playlists[this.playlistScrollIndex];
-        if (!playlist) return;
+    async openPlaylistByMenuIndex(index: number): Promise<void> {
+        const playlistId = this.playlistIdByIndex[index];
+        if (!playlistId) return;
+
+        const playlist = this.playlists[index];
+        this.selectedPlaylistId = playlistId;
+        this.selectedPlaylistName = playlist?.name ?? '';
         this.isBrowseSelectPending = true;
-        await spotifyModel.playPlaylist(playlist.id);
+        await spotifyModel.playPlaylist(playlistId);
         await new Promise(resolve => setTimeout(resolve, 500));
         this.exitBrowseMode();
+    }
+
+    async openSelectedPlaylist(): Promise<void> {
+        await this.openPlaylistByMenuIndex(this.playlistScrollIndex);
     }
 
     async playSelectedTrack(): Promise<void> {
