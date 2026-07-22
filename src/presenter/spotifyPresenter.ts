@@ -22,6 +22,7 @@ class SpotifyPresenter {
     private tracks: SpotifyTrackInfo[] = [];
     private trackScrollIndex = 0;
     private isBrowseLoading = false;
+    private isBrowseSelectPending = false;
 
     async pollSingle() {
         try {
@@ -147,12 +148,15 @@ class SpotifyPresenter {
         this.playlistScrollIndex = 0;
         this.trackScrollIndex = 0;
         this.isBrowseLoading = false;
+        this.isBrowseSelectPending = false;
     }
 
     async openSelectedPlaylist(): Promise<void> {
         const playlist = this.playlists[this.playlistScrollIndex];
         if (!playlist) return;
+        this.isBrowseSelectPending = true;
         await spotifyModel.playPlaylist(playlist.id);
+        await new Promise(resolve => setTimeout(resolve, 500));
         this.exitBrowseMode();
     }
 
@@ -193,6 +197,7 @@ class SpotifyPresenter {
         return {
             mode: this.browseMode,
             isLoading: this.isBrowseLoading,
+            isSelectPending: this.isBrowseSelectPending,
             playlists: this.playlists,
             playlistScrollIndex: this.playlistScrollIndex,
             selectedPlaylistName: this.selectedPlaylistName,

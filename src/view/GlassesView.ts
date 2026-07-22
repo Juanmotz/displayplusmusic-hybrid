@@ -196,7 +196,7 @@ export async function createView(song: Song): Promise<void> {
         const browseStatus = spotifyPresenter.getBrowseStatus();
 
         if (browseStatus.mode !== 'off') {
-            buttonLabels = ['  \u2713', '  \u2191', '  \u2193', '  \u2190'];
+            buttonLabels = [browseStatus.isSelectPending ? '  \u23F3' : '  \u2713', '  \u2191', '  \u2193', '  \u2190'];
             const isPlaylists = browseStatus.mode === 'playlists';
             const items = isPlaylists
                 ? browseStatus.playlists.map(p => p.name)
@@ -204,7 +204,7 @@ export async function createView(song: Song): Promise<void> {
             const idx = isPlaylists ? browseStatus.playlistScrollIndex : browseStatus.trackScrollIndex;
             const heading = isPlaylists ? 'Browse Playlists' : browseStatus.selectedPlaylistName.substring(0, 22);
             displaySongInfo = `${heading}\n${buildBrowseListText(items, idx, browseStatus.isLoading)}`;
-            playbackBarText = '';
+            playbackBarText = browseStatus.isSelectPending ? 'Selecting playlist...' : '';
         } else if (activeSource === 'navidrome') {
             const switcher = spotifyPresenter.getNavidromeClientSwitcherStatus();
             if (switcher.isActive) {
