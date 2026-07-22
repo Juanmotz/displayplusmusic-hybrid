@@ -65,6 +65,15 @@ export async function eventHandler() {
                 return;
             }
 
+            const runBrowseSelect = async () => {
+                const status = spotifyPresenter.getBrowseStatus();
+                if (status.mode === 'playlists') {
+                    await spotifyPresenter.openSelectedPlaylist();
+                } else if (status.mode === 'tracks') {
+                    await spotifyPresenter.playSelectedTrack();
+                }
+            };
+
             if (isDoubleTapEvent(eventTypeName)) {
                 if (spotifyPresenter.isInBrowseMode()) {
                     spotifyPresenter.exitBrowseMode();
@@ -78,7 +87,7 @@ export async function eventHandler() {
             if (spotifyPresenter.isInBrowseMode()) {
                 const selectedName = (listEvent.currentSelectItemName ?? '').trim();
                 if (selectedName === '✓') {
-                    await spotifyPresenter.openSelectedPlaylist();
+                    await runBrowseSelect();
                     return;
                 }
                 if (selectedName === '↑') {
@@ -95,7 +104,7 @@ export async function eventHandler() {
                 }
 
                 switch (listEvent.currentSelectItemIndex) {
-                    case 0: await spotifyPresenter.openSelectedPlaylist(); break;
+                    case 0: await runBrowseSelect(); break;
                     case 1: spotifyPresenter.browseScrollUp(); break;
                     case 2: spotifyPresenter.browseScrollDown(); break;
                     case 3: spotifyPresenter.browseBack(); break;
