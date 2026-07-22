@@ -196,7 +196,8 @@ export async function createView(song: Song): Promise<void> {
         const browseStatus = spotifyPresenter.getBrowseStatus();
 
         if (browseStatus.mode !== 'off') {
-            buttonLabels = [browseStatus.isSelectPending ? '  ...' : '  \u2713', '  \u2191', '  \u2193', '  \u2190'];
+            const pendingSelectIcon = Math.floor(Date.now() / 250) % 2 === 0 ? '\u2191' : '\u2193';
+            buttonLabels = [browseStatus.isSelectPending ? `  ${pendingSelectIcon}` : '  \u2713', '  \u2191', '  \u2193', '  \u2190'];
             const isPlaylists = browseStatus.mode === 'playlists';
             const items = isPlaylists
                 ? browseStatus.playlists.map(p => p.name)
