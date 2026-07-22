@@ -73,7 +73,7 @@ function buildContainerConfig(
                 isEventCapture: 1,
                 itemContainer: new ListItemContainerProperty({
                     itemCount: buttonLabels.length,
-                    itemName: buttonLabels as [string, string, string],
+                    itemName: buttonLabels,
                     isItemSelectBorderEn: 1,
                 }),
             }),
@@ -246,9 +246,22 @@ export async function createView(song: Song): Promise<void> {
             );
             console.log('[GlassesView] createStartUpPageContainer:', result);
 
-            if (result === StartUpPageCreateResult.success || result === StartUpPageCreateResult.invalid) {
-                // success = created fresh; invalid = already exists — either way we're ready
+            if (result === StartUpPageCreateResult.success) {
                 isPageCreated = true;
+            } else if (result === StartUpPageCreateResult.invalid) {
+                // If a stale container already exists on device, rebuild to apply latest layout.
+                isPageCreated = true;
+                const rebuilt = await withTimeout(
+                    bridge.rebuildPageContainer(new RebuildPageContainer(config)),
+                    5000,
+                    false,
+                );
+                if (rebuilt) {
+                    await new Promise(r => setTimeout(r, 300));
+                    lastSongID = '';
+                    imageRetryAt = 0;
+                }
+                return;
             } else {
                 // oversize or outOfMemory — can't recover, don't mark as created
                 console.error('[GlassesView] Fatal container error:', result);

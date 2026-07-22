@@ -1,4 +1,4 @@
-import { waitForEvenAppBridge, OsEventTypeList } from "@evenrealities/even_hub_sdk";
+import { waitForEvenAppBridge } from "@evenrealities/even_hub_sdk";
 import spotifyPresenter from './spotifyPresenter';
 
 function getEventTypeName(eventType: number | undefined): string {
@@ -27,12 +27,6 @@ function isTapEvent(name: string): boolean {
 
 function isDoubleTapEvent(name: string): boolean {
     return name.includes('DOUBLE_CLICK_EVENT');
-}
-
-function isLongPressEvent(name: string): boolean {
-    return name.includes('LONG_PRESS_EVENT')
-        || name.includes('LONG_CLICK_EVENT')
-        || (name.includes('LONG') && name.includes('PRESS'));
 }
 
 export async function eventHandler() {
@@ -71,6 +65,15 @@ export async function eventHandler() {
                 return;
             }
 
+            if (isDoubleTapEvent(eventTypeName)) {
+                if (spotifyPresenter.isInBrowseMode()) {
+                    spotifyPresenter.exitBrowseMode();
+                } else {
+                    await spotifyPresenter.enterBrowseMode();
+                }
+                return;
+            }
+
             // Playlist browser navigation
             if (spotifyPresenter.isInBrowseMode()) {
                 switch (listEvent.currentSelectItemIndex) {
@@ -104,27 +107,6 @@ export async function eventHandler() {
                 default:
                     spotifyPresenter.song_back();
                     break;
-            }
-        }
-        if (event.sysEvent) {
-            const eventType = event.sysEvent.eventType;
-            if (eventType == OsEventTypeList.DOUBLE_CLICK_EVENT) {
-                if (source === 'spotify') {
-                    if (spotifyPresenter.isInBrowseMode()) {
-                        spotifyPresenter.exitBrowseMode();
-                    } else {
-                        await spotifyPresenter.enterBrowseMode();
-                    }
-                    return;
-                }
-                if (source === 'navidrome') {
-                    if (spotifyPresenter.isInNavidromeClientSwitcherMode()) {
-                        spotifyPresenter.cancelNavidromeClientSwitcherMode();
-                    } else {
-                        spotifyPresenter.enterNavidromeClientSwitcherMode();
-                    }
-                    return;
-                }
             }
         }
     });
